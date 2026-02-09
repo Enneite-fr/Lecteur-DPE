@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-import streamlit as st
+
 
 def safe_text(element):
     """Safely return text from an XML element, or empty string."""
@@ -90,6 +90,7 @@ def parse_dpe_file(uploaded_file):
             carac = logement.find('caracteristique_generale')
             if carac:
                 data['surface'] = safe_float(safe_text(carac.find('surface_habitable_logement')))
+                data['nombre_niveaux'] = safe_text(carac.find('nombre_niveau_logement'))
                 data['annee_construction'] = safe_text(carac.find('annee_construction'))
             
             # Meteo
@@ -213,7 +214,7 @@ def parse_dpe_file(uploaded_file):
             # --- Fiche Technique (Details) ---
             # Initialise defaults
             data.update({
-                'periode_construction': data.get('annee_construction', 'Inconnue'),
+                'periode_construction': data.get('annee_construction'),
                 'hsp': 'Non précis',
                 'mur_materiaux': 'Non précis',
                 'isolation_type': 'Non précis',
@@ -286,6 +287,21 @@ def parse_dpe_file(uploaded_file):
                                 data['altitude'] = val
                             elif 'Zone climatique' in desc: # Might not be explicit in description like this
                                 data['zone_climatique'] = val
+                            elif 'Année de construction' in desc:
+                                data['periode_construction'] = val
+
+            # Fallback for construction period if not found in fiche_technique
+            if not data.get('periode_construction'):
+                # Mapping ID to text
+                # 1: Avant 1948, 2: 1949-1974, 3: 1975-1977, 4: 1978-1982, 5: 1983-1988
+                # 6: 1989-2000, 7: 2001-2005, 8: 2006-2012, 9: 2013-2021, 10: Après 2021
+                period_map = {
+                    '1': "Avant 1948", '2': "1949-1974", '3': "1975-1977", '4': "1978-1982",
+                    '5': "1983-1988", '6': "1989-2000", '7': "2001-2005", '8': "2006-2012",
+                    '9': "2013-2021", '10': "Après 2021"
+                }
+                pid = safe_text(logement.find('caracteristique_generale/enum_periode_construction_id'))
+                data['periode_construction'] = period_map.get(pid, "Inconnue")
 
             # --- Enveloppe Details (Heat Loss & Comfort) ---
             data['deperditions'] = {}
